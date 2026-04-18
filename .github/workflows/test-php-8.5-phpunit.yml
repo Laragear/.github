@@ -1,0 +1,170 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow
+
+name: Tests - PHP 8.5 - PHPUnit
+
+# ──────────────────────────────────────────────────────────────
+# 1. CONCURRENCY
+# ──────────────────────────────────────────────────────────────
+#
+# Only allow a single run for the repository tag/branch. If one
+# is already running, stop that and create a new run.
+#
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ──────────────────────────────────────────────────────────────
+# 2. REUSSABILITY
+# ──────────────────────────────────────────────────────────────
+#
+# Require the Laravel minimum contraing, using the default min
+# maintained version. The repo may also input a different set
+# of expected files that would be exported when publishing.
+#
+
+on:
+  workflow_call:
+    inputs:
+      laravel_constraint_min:
+        description: Minimum Laravel version constraint
+        required: false
+        # Laravel Session Cache: ^12.29
+        default: '12.*'
+        type: string
+      expected_files:
+        description: 'Comma-separated list of expected exported files'
+        type: string
+        required: false
+        default: 'LICENSE.md,README.md,composer.json'
+    secrets:
+      CODECOV_TOKEN:
+        description: 'Codecov token for coverage upload'
+        required: true
+
+# ──────────────────────────────────────────────────────────────
+# 2. JOBS
+# ──────────────────────────────────────────────────────────────
+#
+# There are two gated jobs: byte level verification and syntax
+# errors check. After these, PHPUnit tests run along with the
+# static analysis and a verification on the published files.
+#
+
+jobs:
+
+  byte_level:
+    name: 0️⃣ Byte-level
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Check file permissions
+        run: |
+          test $(find . -type f -not -path './.git/*' -executable) ==
+      - name: Find non-printable ASCII characters
+        run: |
+          ! LC_ALL=C.UTF-8 find ./src -type f -name *.php -print0 | xargs -0 -- grep -PHn [^ -~]
+
+  syntax_errors:
+    name: 1️⃣ Syntax errors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up PHP
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f
+        with:
+          php-version: latest
+          tools: mago
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      - name: Check source code for syntax errors
+        run: mago lint src/
+
+  unit_tests:
+    name: 2️⃣ Unit and Feature tests
+    needs:
+      - byte_level
+      - syntax_errors
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version:
+          - 8.3
+          - 8.4
+          - 8.5
+        laravel-constraint:
+          - "${{ inputs.laravel_constraint_min }}"
+          - 13.*
+        dependencies:
+          - lowest
+          - highest
+    steps:
+      - name: Set up PHP
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: mbstring, intl
+          coverage: xdebug
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda
+        with:
+          dependency-versions: ${{ matrix.dependencies }}
+          composer-options: --with=laravel/framework:${{ matrix.laravel-constraint }}
+
+      - name: Execute unit tests
+        run: composer run-script test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ github.repository }}
+
+  static_analysis:
+    name: 3️⃣ Static Analysis
+    needs:
+      - byte_level
+      - syntax_errors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up PHP
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f
+        with:
+          tools: mago
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda
+
+      - name: Execute static analysis
+        run: mago check src/
+
+  exported_files:
+    name: 4️⃣ Exported files
+    needs:
+      - byte_level
+      - syntax_errors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Check exported files
+        run: |
+          EXPECTED="${{ inputs.expected_files }}"
+          CURRENT=$(git archive HEAD | tar --list --exclude=src --exclude=src/* --exclude=.stubs --exclude=.stubs/* --exclude=routes --exclude=routes/* --exclude=stubs --exclude=stubs/* --exclude=lang --exclude=lang/* --exclude=config --exclude=config/* --exclude=database --exclude=database/* --exclude=resources --exclude=resources/* | paste -s -d ,)
+          echo CURRENT =${CURRENT}
+          echo EXPECTED=${EXPECTED}
+          test "${CURRENT}" == "${EXPECTED}"
