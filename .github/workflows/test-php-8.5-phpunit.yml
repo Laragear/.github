@@ -149,7 +149,7 @@ jobs:
         uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda
 
       - name: Execute static analysis
-        run: mago analize
+        run: mago analyze
 
   exported_files:
     name: 4️⃣ Exported files
