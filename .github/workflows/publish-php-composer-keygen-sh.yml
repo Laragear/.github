@@ -1,0 +1,40 @@
+name: Reusable Keygen Publisher
+
+on:
+  workflow_call:
+    inputs:
+      resource_id:
+        description: 'The existing Keygen Resource/Product ID'
+        required: true
+        type: string
+      artifact_path:
+        description: 'Path to the file to upload'
+        required: true
+        type: string
+      filename:
+        description: 'Name of the file as it should appear in Keygen'
+        required: true
+        type: string
+    secrets:
+      KEYGEN_TOKEN:
+        description: 'Keygen Product or Admin Token'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install Keygen CLI
+        run: |
+          curl -L https://get.keygen.sh | sh
+
+      - name: Upload Artifact to Keygen
+        run: |
+          keygen upload "${{ inputs.file_path }}" \
+            --release "${{ inputs.release_id }}" \
+            --platform "${{ inputs.platform }}" \
+            --token "${{ secrets.KEYGEN_TOKEN }}" \
+            --account "${{ secrets.KEYGEN_ACCOUNT_ID }}"
