@@ -16,8 +16,6 @@ jobs:
   call-workflow:
     # Syntax: {owner}/{repo}/.github/workflows/{filename}@{ref}
     uses: Laragear/.github/.github/workflows/issue-manager.yml@main
-    with:
-      exclude_url_string: "laragear"
     secrets: inherit
 ```
 
@@ -44,6 +42,6 @@ jobs:
     uses: Laragear/.github/.github/workflows/test-php-8.5-phpunit.yml@main
     secrets: inherit                      # required to pass org-wide secrets.
     with:
-      laravel_constraint_min: "^12.29"    # Required for Laravel Session Cache
-      expected_files: "LICENSE.md,README.md,composer.json"
+      laravel_constraint_min: "^12.29"    # Required for Laravel Session Cache. Adjust or remove.
+      expected_files: "LICENSE.md,README.md,composer.json" # Add or remove for defaults.
 ```
