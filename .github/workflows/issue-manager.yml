@@ -1,0 +1,131 @@
+name: Issue Management
+
+on:
+  workflow_call:
+    inputs:
+      exclude_url_string:
+        required: true
+        type: string
+        description: "The string to check for in the URL to ensure it's not the main org (e.g., 'laragear')"
+
+jobs:
+  check-repro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const URL_REGEXP = /### Reproduction repository \(issue will be closed if this is not valid\)[\r\n]+([^#]+)###/m
+            const REPRO_STEPS_REGEXP = /### Steps to reproduce[\r\n]+([^#]+)###/m
+            const LABEL_NEEDS_MORE_INFORMATION = 'needs more info'
+            const EXCLUDE_URL = '${{ inputs.exclude_url_string }}'
+
+            function debug(...args) {
+                core.info(args.map(JSON.stringify).join(' '))
+            }
+
+            if (context.payload.comment) {
+                debug('Ignoring comment update.')
+                return
+            }
+
+            const user = context.payload.sender.login
+            const issue = context.payload.issue
+            const body = issue.body
+
+            const urlMatch = body.match(URL_REGEXP)
+            const reproStepsMatch = body.match(REPRO_STEPS_REGEXP)
+            const url = urlMatch !== null ? urlMatch[1].trim() : null
+            const reproSteps = reproStepsMatch !== null ? reproStepsMatch[1].trim() : null
+
+            debug(`Found URL '${url}'`)
+            debug(`Found repro steps '${reproSteps}'`)
+
+            async function createComment(comment) {
+                comment = comment.split('\n').map((line) => line.trim()).join('\n').trim()
+                await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: comment,
+                })
+            }
+
+            async function getGitHubActionComments() {
+                const comments = await github.rest.issues.listComments({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                })
+                return comments.data.filter(comment => comment.user.login === 'github-actions[bot]')
+            }
+
+            async function getIssueLabels() {
+                const issues = await github.rest.issues.listLabelsOnIssue({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                })
+                return issues.data
+            }
+
+            async function updateIssue(state, state_reason = null) {
+                await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number,
+                    state,
+                    state_reason,
+                })
+            }
+
+            async function closeWithComment(comment) {
+                if (issue.state !== 'open') return
+                const comments = await getGitHubActionComments()
+                if (comments.length > 0) return
+
+                await github.rest.issues.addLabels({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    labels: [LABEL_NEEDS_MORE_INFORMATION],
+                })
+                await createComment(comment)
+                await updateIssue('closed', 'not_planned')
+            }
+
+            async function openWithComment(comment) {
+                if (issue.state !== 'closed') return
+                const labels = await getIssueLabels()
+                if (!labels.find(l => l.name === LABEL_NEEDS_MORE_INFORMATION)) return
+                
+                const comments = await getGitHubActionComments()
+                if (comments.length === 0) return
+
+                await github.rest.issues.removeLabel({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: LABEL_NEEDS_MORE_INFORMATION,
+                })
+                await createComment(comment)
+                await updateIssue('open')
+            }
+
+            const COMMENT_HEADER = `Hey @${user}! We're sorry to hear that you've hit this issue.`
+            
+            const NO_REPRO_URL = (!url || !url.includes('https://github.com/') || url.includes(`https://github.com/${EXCLUDE_URL}`))
+            const NO_REPRO_STEPS = !reproSteps || reproSteps.length < 25
+
+            if (NO_REPRO_URL || NO_REPRO_STEPS) {
+                let comment = `${COMMENT_HEADER}\n\n`
+                if (NO_REPRO_URL) {
+                    comment += `However, it looks like you forgot to fill in the reproduction repository URL... [truncated for brevity]`
+                }
+                if (NO_REPRO_STEPS) {
+                    comment += `\n\nAlso, it doesn't look like you've provided much information on how to replicate the issue.`
+                }
+                await closeWithComment(comment)
+            } else {
+                await openWithComment(`Thank you for providing reproduction steps! Reopening the issue now.`)
+            }
