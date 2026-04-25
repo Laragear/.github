@@ -18,7 +18,7 @@ jobs:
             const URL_REGEXP = /### Reproduction repository \(issue will be closed if this is not valid\)[\r\n]+([^#]+)###/m
             const REPRO_STEPS_REGEXP = /### Steps to reproduce[\r\n]+([^#]+)###/m
             const LABEL_NEEDS_MORE_INFORMATION = 'needs more info'
-            const EXCLUDE_URL = '${{ inputs.exclude_url_string }}'
+            const EXCLUDE_URL = 'laragear'
 
             function debug(...args) {
                 core.info(args.map(JSON.stringify).join(' '))
