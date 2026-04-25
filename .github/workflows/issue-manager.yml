@@ -2,11 +2,6 @@ name: Issue Management
 
 on:
   workflow_call:
-    inputs:
-      exclude_url_string:
-        required: true
-        type: string
-        description: "The string to check for in the URL to ensure it's not the main org (e.g., 'laragear')"
 
 jobs:
   check-repro:
@@ -18,7 +13,6 @@ jobs:
             const URL_REGEXP = /### Reproduction repository \(issue will be closed if this is not valid\)[\r\n]+([^#]+)###/m
             const REPRO_STEPS_REGEXP = /### Steps to reproduce[\r\n]+([^#]+)###/m
             const LABEL_NEEDS_MORE_INFORMATION = 'needs more info'
-            const EXCLUDE_URL = 'laragear'
 
             function debug(...args) {
                 core.info(args.map(JSON.stringify).join(' '))
@@ -114,7 +108,7 @@ jobs:
 
             const COMMENT_HEADER = `Hey @${user}! We're sorry to hear that you've hit this issue.`
             
-            const NO_REPRO_URL = (!url || !url.includes('https://github.com/') || url.includes(`https://github.com/${EXCLUDE_URL}`))
+            const NO_REPRO_URL = (!url || !url.includes('https://github.com/') || url.includes(`https://github.com/laragear`) || url.includes(`https://github.com/Laragear`))
             const NO_REPRO_STEPS = !reproSteps || reproSteps.length < 25
 
             if (NO_REPRO_URL || NO_REPRO_STEPS) {
