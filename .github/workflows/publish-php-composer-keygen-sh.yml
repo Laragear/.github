@@ -67,6 +67,9 @@ jobs:
         run: |
           keygen untag \
             --release 'latest' \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             || echo "No release currently tagged 'latest' — skipping."
 
       - name: Untag major version alias in Keygen (${{ steps.meta.outputs.major_tag }})
