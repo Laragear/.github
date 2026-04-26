@@ -23,7 +23,7 @@ jobs:
       KEYGEN_ACCOUNT_ID: ${{ secrets.KEYGEN_ACCOUNT_ID }}
       KEYGEN_PRODUCT_ID: ${{ inputs.resource_id }}
       KEYGEN_PRODUCT_TOKEN: ${{ secrets.KEYGEN_PRODUCT_TOKEN }}
-      VERSION: ${{ github.event.release.tag_name }}
+      KEYGEN_VERSION: ${{ github.event.release.tag_name }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
@@ -31,7 +31,11 @@ jobs:
       - name: Resolve version metadata
         id: meta
         run: |
-          MAJOR=$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)
+          # Strip leading "v" for Keygen (it requires bare semver)
+          KEYGEN_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          echo "keygen_version=${KEYGEN_VERSION}" >> "$GITHUB_OUTPUT"
+
+          MAJOR=$(echo "$KEYGEN_VERSION" | cut -d. -f1)
           echo "major_tag=${MAJOR}.x" >> "$GITHUB_OUTPUT"
 
           IS_LATEST=$(gh release list \
@@ -73,14 +77,14 @@ jobs:
           echo "No release currently tagged '${MAJOR_TAG}' — skipping."
           fi
 
-      - name: Delete existing Keygen release "${{ env.VERSION }}" (if any)
+      - name: Untag major version alias (${{ steps.meta.outputs.major_tag }})
         run: |
           if ! keygen del \
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --release "$VERSION"; then
-          echo "Release '${VERSION}' not found in Keygen — skipping delete."
+            --release "${{ steps.meta.outputs.keygen_version }}"; then
+          echo "Release '${{ steps.meta.outputs.keygen_version }}' not found in Keygen — skipping delete."
           fi
 
       - name: Create Keygen release (draft)
@@ -89,7 +93,7 @@ jobs:
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --version "$VERSION" \
+            --version "${{ steps.meta.outputs.keygen_version }}" \
             --channel "Stable"
 
       - name: Upload artifact to Keygen
@@ -98,7 +102,7 @@ jobs:
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --release "$VERSION" \
+            --release "${{ steps.meta.outputs.keygen_version }}" \
             --platform "php" \
             --arch "any"
 
@@ -108,7 +112,7 @@ jobs:
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --release "$VERSION"
+            --release "${{ steps.meta.outputs.keygen_version }}"
 
       - name: Tag Keygen release as "latest"
         if: steps.meta.outputs.is_latest == 'true'
@@ -117,7 +121,7 @@ jobs:
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --release "$VERSION"
+            --release "${{ steps.meta.outputs.keygen_version }}"
 
       - name: Tag Keygen release as major version alias (${{ steps.meta.outputs.major_tag }})
         run: |
@@ -126,4 +130,4 @@ jobs:
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
-            --release "$VERSION"
+            --release "${{ steps.meta.outputs.keygen_version }}"
