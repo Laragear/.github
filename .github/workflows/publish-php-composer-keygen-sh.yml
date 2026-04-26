@@ -76,25 +76,39 @@ jobs:
       - name: Untag major version alias in Keygen (${{ steps.meta.outputs.major_tag }})
         run: |
           MAJOR_TAG="${{ steps.meta.outputs.major_tag }}"
-          keygen untag \
-            --release "$MAJOR_TAG" \
-            || echo "No release currently tagged '${MAJOR_TAG}' — skipping."
+          if ! keygen untag \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
+            --release "$MAJOR_TAG"; then
+          echo "No release currently tagged '${MAJOR_TAG}' — skipping."
+          fi
 
       - name: Delete existing Keygen release "${{ env.VERSION }}" (if any)
         run: |
-          keygen del \
-            --release "$VERSION" \
-            || echo "Release '${VERSION}' not found in Keygen — skipping delete."
+          if ! keygen del \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
+            --release "$VERSION"; then
+          echo "Release '${VERSION}' not found in Keygen — skipping delete."
+          fi
 
       - name: Create Keygen release (draft)
         run: |
           keygen new \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             --version "$VERSION" \
             --channel "stable"
 
       - name: Upload artifact to Keygen
         run: |
           keygen upload ./package.zip \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             --release "$VERSION" \
             --platform "php" \
             --arch "any"
@@ -102,16 +116,25 @@ jobs:
       - name: Publish Keygen release
         run: |
           keygen publish \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             --release "$VERSION"
 
       - name: Tag Keygen release as "latest"
         if: steps.meta.outputs.is_latest == 'true'
         run: |
           keygen tag 'latest' \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             --release "$VERSION"
 
       - name: Tag Keygen release as major version alias (${{ steps.meta.outputs.major_tag }})
         run: |
           MAJOR_TAG="${{ steps.meta.outputs.major_tag }}"
           keygen tag "$MAJOR_TAG" \
+            --account "$KEYGEN_ACCOUNT_ID" \
+            --product "$KEYGEN_PRODUCT_ID" \
+            --token "$KEYGEN_PRODUCT_TOKEN" \
             --release "$VERSION"
