@@ -28,6 +28,37 @@ jobs:
       GH_TOKEN: ${{ github.token }}
 
     steps:
+
+      - name: Diagnose Keygen credentials
+        run: |
+          echo "=== CLI version ==="
+          keygen version
+
+          echo "=== Verify account exists ==="
+          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID" \
+            -H "Accept: application/json" \
+            | jq '.data.id, .data.attributes.slug' \
+            || echo "FAIL: account not found or unreachable"
+
+          echo "=== Verify token and resolve its product ==="
+          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/tokens" \
+            -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
+            -H "Accept: application/json" \
+            | jq '.data[0].relationships.bearer' \
+            || echo "FAIL: token invalid or insufficient permissions"
+
+          echo "=== Verify product ID ==="
+          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/products/$KEYGEN_PRODUCT_ID" \
+            -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
+            -H "Accept: application/json" \
+            | jq '.data.id, .data.attributes.name' \
+            || echo "FAIL: product ID not found under this account"
+
+          echo "=== Resolved inputs ==="
+          echo "VERSION       : $VERSION"
+          echo "KEYGEN_VERSION: ${{ steps.meta.outputs.keygen_version }}"
+          echo "MAJOR_TAG     : ${{ steps.meta.outputs.major_tag }}"
+          echo "IS_LATEST     : ${{ steps.meta.outputs.is_latest }}"
       
       - name: Resolve version metadata
         id: meta
@@ -95,7 +126,7 @@ jobs:
             --product "$KEYGEN_PRODUCT_ID" \
             --token "$KEYGEN_PRODUCT_TOKEN" \
             --version "${{ steps.meta.outputs.keygen_version }}" \
-            --channel "Stable"
+            --channel "stable"
 
       - name: Upload artifact to Keygen
         run: |
