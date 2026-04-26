@@ -48,7 +48,7 @@ jobs:
           IS_LATEST=$(gh release list \
             --repo "$GITHUB_REPOSITORY" \
             --json tagName,isLatest \
-            --jq --arg v "$VERSION" '.[] | select(.tagName == $v) | .isLatest')
+            | jq -r --arg v "$VERSION" '.[] | select(.tagName == $v) | .isLatest')
           echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
 
       - name: Download release archive via gh CLI
