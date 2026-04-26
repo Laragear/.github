@@ -42,15 +42,13 @@ jobs:
       - name: Resolve version metadata
         id: meta
         run: |
-          # Strip a leading "v" if present, then extract the major segment.
           MAJOR=$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)
           echo "major_tag=${MAJOR}.x" >> "$GITHUB_OUTPUT"
 
-          # Ask GitHub whether this is the repo's current "latest" release.
-          IS_LATEST=$(gh release view "$VERSION" \
+          IS_LATEST=$(gh release list \
             --repo "$GITHUB_REPOSITORY" \
-            --json isLatest \
-            --jq '.isLatest')
+            --json tagName,isLatest \
+            --jq --arg v "$VERSION" '.[] | select(.tagName == $v) | .isLatest')
           echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
 
       - name: Download release archive via gh CLI
