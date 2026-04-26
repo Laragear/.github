@@ -61,31 +61,27 @@ jobs:
           echo "=== CLI version ==="
           keygen version
 
-          echo "=== Verify account exists ==="
-          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID" \
-            -H "Accept: application/json" \
-            | jq '.data.id, .data.attributes.slug' \
-            || echo "FAIL: account not found or unreachable"
+          echo "=== Raw account response ==="
+          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID" \
+            -H "Accept: application/json"
 
-          echo "=== Verify token and resolve its product ==="
-          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/tokens" \
+          echo ""
+          echo "=== Raw token/whoami response ==="
+          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/me" \
             -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
-            -H "Accept: application/json" \
-            | jq '.data[0].relationships.bearer' \
-            || echo "FAIL: token invalid or insufficient permissions"
+            -H "Accept: application/json"
 
-          echo "=== Verify product ID ==="
-          curl -sf "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/products/$KEYGEN_PRODUCT_ID" \
+          echo ""
+          echo "=== Raw product response ==="
+          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/products/$KEYGEN_PRODUCT_ID" \
             -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
-            -H "Accept: application/json" \
-            | jq '.data.id, .data.attributes.name' \
-            || echo "FAIL: product ID not found under this account"
+            -H "Accept: application/json"
 
+          echo ""
           echo "=== Resolved inputs ==="
-          echo "VERSION       : $VERSION"
-          echo "KEYGEN_VERSION: ${{ steps.meta.outputs.keygen_version }}"
-          echo "MAJOR_TAG     : ${{ steps.meta.outputs.major_tag }}"
-          echo "IS_LATEST     : ${{ steps.meta.outputs.is_latest }}"
+          echo "KEYGEN_VERSION : ${{ steps.meta.outputs.keygen_version }}"
+          echo "MAJOR_TAG      : ${{ steps.meta.outputs.major_tag }}"
+          echo "IS_LATEST      : ${{ steps.meta.outputs.is_latest }}"
 
       - name: Untag "latest" in Keygen
         if: steps.meta.outputs.is_latest == 'true'
