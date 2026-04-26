@@ -1,4 +1,4 @@
-name: Reusable Keygen Publisher
+name: Publish Artifact to KeyGen
 
 on:
   workflow_call:
@@ -16,25 +16,100 @@ on:
         required: true
         type: string
     secrets:
-      KEYGEN_TOKEN:
-        description: 'Keygen Product or Admin Token'
+      KEYGEN_ACCOUNT_ID:
+        description: 'Keygen Account ID'
+        required: true
+      KEYGEN_PRODUCT_ID:
+        description: 'Keygen Product ID'
+        required: true
+      KEYGEN_PRODUCT_TOKEN:
+        description: 'Keygen Product Token'
         required: true
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    env:
+      KEYGEN_ACCOUNT_ID: ${{ secrets.KEYGEN_ACCOUNT_ID }}
+      KEYGEN_PRODUCT_ID: ${{ secrets.KEYGEN_PRODUCT_ID }}
+      KEYGEN_PRODUCT_TOKEN: ${{ secrets.KEYGEN_PRODUCT_TOKEN }}
+      VERSION: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          # Strip a leading "v" if present, then extract the major segment.
+          MAJOR=$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)
+          echo "major_tag=${MAJOR}.x" >> "$GITHUB_OUTPUT"
+
+          # Ask GitHub whether this is the repo's current "latest" release.
+          IS_LATEST=$(gh release view "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json isLatest \
+            --jq '.isLatest')
+          echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release archive via gh CLI
+        run: |
+          gh release download "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --archive=zip \
+            --output=package.zip
 
       - name: Install Keygen CLI
         run: |
-          curl -L https://get.keygen.sh | sh
+          curl -sSL https://raw.pkg.keygen.sh/keygen/cli/latest/install.sh | sh
 
-      - name: Upload Artifact to Keygen
+      - name: Untag "latest" in Keygen
+        if: steps.meta.outputs.is_latest == 'true'
         run: |
-          keygen upload "${{ inputs.file_path }}" \
-            --release "${{ inputs.release_id }}" \
-            --platform "${{ inputs.platform }}" \
-            --token "${{ secrets.KEYGEN_TOKEN }}" \
-            --account "${{ secrets.KEYGEN_ACCOUNT_ID }}"
+          keygen untag \
+            --release 'latest' \
+            || echo "No release currently tagged 'latest' — skipping."
+
+      - name: Untag major version alias in Keygen (${{ steps.meta.outputs.major_tag }})
+        run: |
+          MAJOR_TAG="${{ steps.meta.outputs.major_tag }}"
+          keygen untag \
+            --release "$MAJOR_TAG" \
+            || echo "No release currently tagged '${MAJOR_TAG}' — skipping."
+
+      - name: Delete existing Keygen release "${{ env.VERSION }}" (if any)
+        run: |
+          keygen del \
+            --release "$VERSION" \
+            || echo "Release '${VERSION}' not found in Keygen — skipping delete."
+
+      - name: Create Keygen release (draft)
+        run: |
+          keygen new \
+            --version "$VERSION" \
+            --channel "stable"
+
+      - name: Upload artifact to Keygen
+        run: |
+          keygen upload ./package.zip \
+            --release "$VERSION" \
+            --platform "php" \
+            --arch "any"
+
+      - name: Publish Keygen release
+        run: |
+          keygen publish \
+            --release "$VERSION"
+
+      - name: Tag Keygen release as "latest"
+        if: steps.meta.outputs.is_latest == 'true'
+        run: |
+          keygen tag 'latest' \
+            --release "$VERSION"
+
+      - name: Tag Keygen release as major version alias (${{ steps.meta.outputs.major_tag }})
+        run: |
+          MAJOR_TAG="${{ steps.meta.outputs.major_tag }}"
+          keygen tag "$MAJOR_TAG" \
+            --release "$VERSION"
