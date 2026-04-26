@@ -28,6 +28,33 @@ jobs:
       GH_TOKEN: ${{ github.token }}
 
     steps:
+      
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          # Strip leading "v" for Keygen (it requires bare semver)
+          KEYGEN_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          echo "keygen_version=${KEYGEN_VERSION}" >> "$GITHUB_OUTPUT"
+
+          MAJOR=$(echo "$KEYGEN_VERSION" | cut -d. -f1)
+          echo "major_tag=${MAJOR}.x" >> "$GITHUB_OUTPUT"
+
+          IS_LATEST=$(gh release list \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isLatest \
+            | jq -r --arg v "$VERSION" '.[] | select(.tagName == $v) | .isLatest')
+          echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release archive via gh CLI
+        run: |
+          gh release download "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --archive=zip \
+            --output=package.zip
+
+      - name: Install Keygen CLI
+        run: |
+          curl -sSL https://raw.pkg.keygen.sh/keygen/cli/latest/install.sh | sh
 
       - name: Diagnose Keygen credentials
         run: |
@@ -59,33 +86,6 @@ jobs:
           echo "KEYGEN_VERSION: ${{ steps.meta.outputs.keygen_version }}"
           echo "MAJOR_TAG     : ${{ steps.meta.outputs.major_tag }}"
           echo "IS_LATEST     : ${{ steps.meta.outputs.is_latest }}"
-      
-      - name: Resolve version metadata
-        id: meta
-        run: |
-          # Strip leading "v" for Keygen (it requires bare semver)
-          KEYGEN_VERSION=$(echo "$VERSION" | sed 's/^v//')
-          echo "keygen_version=${KEYGEN_VERSION}" >> "$GITHUB_OUTPUT"
-
-          MAJOR=$(echo "$KEYGEN_VERSION" | cut -d. -f1)
-          echo "major_tag=${MAJOR}.x" >> "$GITHUB_OUTPUT"
-
-          IS_LATEST=$(gh release list \
-            --repo "$GITHUB_REPOSITORY" \
-            --json tagName,isLatest \
-            | jq -r --arg v "$VERSION" '.[] | select(.tagName == $v) | .isLatest')
-          echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
-
-      - name: Download release archive via gh CLI
-        run: |
-          gh release download "$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --archive=zip \
-            --output=package.zip
-
-      - name: Install Keygen CLI
-        run: |
-          curl -sSL https://raw.pkg.keygen.sh/keygen/cli/latest/install.sh | sh
 
       - name: Untag "latest" in Keygen
         if: steps.meta.outputs.is_latest == 'true'
