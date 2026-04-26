@@ -65,12 +65,13 @@ jobs:
       - name: Untag "latest" in Keygen
         if: steps.meta.outputs.is_latest == 'true'
         run: |
-          keygen untag \
+          if ! keygen untag \
             --release 'latest' \
             --account "$KEYGEN_ACCOUNT_ID" \
             --product "$KEYGEN_PRODUCT_ID" \
-            --token "$KEYGEN_PRODUCT_TOKEN" \
-            || echo "No release currently tagged 'latest' — skipping."
+            --token "$KEYGEN_PRODUCT_TOKEN"; then
+          echo "Warning: Untag failed (likely no 'latest' tag exists or API mismatch). Proceeding..."
+          fi
 
       - name: Untag major version alias in Keygen (${{ steps.meta.outputs.major_tag }})
         run: |
