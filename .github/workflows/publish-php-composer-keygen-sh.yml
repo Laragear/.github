@@ -56,33 +56,6 @@ jobs:
         run: |
           curl -sSL https://raw.pkg.keygen.sh/keygen/cli/latest/install.sh | sh
 
-      - name: Diagnose Keygen credentials
-        run: |
-          echo "=== CLI version ==="
-          keygen version
-
-          echo "=== Raw account response ==="
-          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID" \
-            -H "Accept: application/json"
-
-          echo ""
-          echo "=== Raw token/whoami response ==="
-          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/me" \
-            -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
-            -H "Accept: application/json"
-
-          echo ""
-          echo "=== Raw product response ==="
-          curl -s "https://api.keygen.sh/v1/accounts/$KEYGEN_ACCOUNT_ID/products/$KEYGEN_PRODUCT_ID" \
-            -H "Authorization: Bearer $KEYGEN_PRODUCT_TOKEN" \
-            -H "Accept: application/json"
-
-          echo ""
-          echo "=== Resolved inputs ==="
-          echo "KEYGEN_VERSION : ${{ steps.meta.outputs.keygen_version }}"
-          echo "MAJOR_TAG      : ${{ steps.meta.outputs.major_tag }}"
-          echo "IS_LATEST      : ${{ steps.meta.outputs.is_latest }}"
-
       - name: Untag "latest" in Keygen
         if: steps.meta.outputs.is_latest == 'true'
         run: |
