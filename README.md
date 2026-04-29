@@ -14,7 +14,6 @@ on:
 
 jobs:
   call-workflow:
-    # Syntax: {owner}/{repo}/.github/workflows/{filename}@{ref}
     uses: Laragear/.github/.github/workflows/issue-manager.yml@main
     secrets: inherit
 ```
