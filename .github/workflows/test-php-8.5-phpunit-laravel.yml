@@ -26,6 +26,12 @@ concurrency:
 on:
   workflow_call:
     inputs:
+      laravel_constraint_min:
+        description: Minimum Laravel version constraint
+        required: false
+        # Laravel Session Cache: ^12.29
+        default: '12.*'
+        type: string
       expected_files:
         description: 'Comma-separated list of expected exported files'
         type: string
@@ -92,6 +98,9 @@ jobs:
           - 8.3
           - 8.4
           - 8.5
+        laravel-constraint:
+          - "${{ inputs.laravel_constraint_min }}"
+          - 13.*
         dependencies:
           - lowest
           - highest
@@ -110,6 +119,7 @@ jobs:
         uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda
         with:
           dependency-versions: ${{ matrix.dependencies }}
+          composer-options: --with=laravel/framework:${{ matrix.laravel-constraint }}
 
       - name: Execute unit tests
         run: composer run-script test
